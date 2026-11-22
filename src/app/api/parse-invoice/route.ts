@@ -20,7 +20,7 @@ export async function POST(req: Request) {
     const ai = new GoogleGenAI({ apiKey });
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.8-flash",
       contents: `Ekstrak detail invoice dari teks berikut menjadi struktur JSON yang rapi dan profesional.
 Jika user meminta bahasa tertentu (misalnya "in English" atau "buat in english"), gunakan bahasa tersebut untuk field "language" ("en" atau "id") serta terjemahkan/rapikan deskripsi item dan catatan pembayaran ke bahasa yang diminta.
 Teks user: "${prompt}"`,
