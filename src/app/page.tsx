@@ -62,6 +62,14 @@ const LABELS = {
   },
 };
 
+function sanitizeFilePart(value: string, fallback: string) {
+  const cleaned = value
+    .replace(/[\\/:*?"<>|]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned || fallback;
+}
+
 export default function MyInvoiceAI() {
   const [aiPrompt, setAiPrompt] = useState("");
   const [isParsing, setIsParsing] = useState(false);
@@ -99,6 +107,25 @@ export default function MyInvoiceAI() {
   const t = LABELS[lang];
   const activeCurrency =
     CURRENCY_OPTIONS.find((c) => c.code === currency) || CURRENCY_OPTIONS[0];
+
+  const pdfFileName = `${sanitizeFilePart(
+    clientName || senderName,
+    "NAMA PT"
+  )}-${sanitizeFilePart(invoiceNumber, "NOMOR INVOICE")}`;
+
+  const handlePrintPdf = () => {
+    const previousTitle = document.title;
+    document.title = pdfFileName;
+
+    const restoreTitle = () => {
+      document.title = previousTitle;
+      window.removeEventListener("afterprint", restoreTitle);
+    };
+
+    window.addEventListener("afterprint", restoreTitle);
+    window.print();
+    setTimeout(restoreTitle, 1500);
+  };
 
   const formatMoney = (amount: number) => {
     const isZeroDecimal = currency === "IDR";
@@ -211,7 +238,8 @@ export default function MyInvoiceAI() {
           </div>
 
           <button
-            onClick={() => window.print()}
+            onClick={handlePrintPdf}
+            title={`Simpan PDF sebagai: ${pdfFileName}.pdf`}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition cursor-pointer"
           >
             <Printer className="w-4 h-4" />
