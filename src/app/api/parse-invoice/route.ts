@@ -1,6 +1,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { NextResponse } from "next/server";
 
+const MODELS = ["gemini-3.8-flash", "gemini-2.5-flash"];
+
 export async function POST(req: Request) {
   try {
     const { prompt } = await req.json();
@@ -19,48 +21,79 @@ export async function POST(req: Request) {
 
     const ai = new GoogleGenAI({ apiKey });
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
-      contents: `Ekstrak detail invoice dari teks berikut menjadi struktur JSON yang rapi dan profesional.
+    const contents = `Ekstrak detail invoice dari teks berikut menjadi struktur JSON yang rapi dan profesional.
 Jika user meminta bahasa tertentu (misalnya "in English" atau "buat in english"), gunakan bahasa tersebut untuk field "language" ("en" atau "id") serta terjemahkan/rapikan deskripsi item dan catatan pembayaran ke bahasa yang diminta.
-Teks user: "${prompt}"`,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            language: {
-              type: Type.STRING,
-              description: "Kode bahasa invoice: 'id' untuk Indonesia atau 'en' untuk Inggris",
-            },
-            currency: {
-              type: Type.STRING,
-              description: "Kode mata uang ISO seperti 'IDR', 'USD', 'SGD', 'EUR'",
-            },
-            clientName: { type: Type.STRING },
-            clientAddress: { type: Type.STRING },
-            taxRate: { type: Type.NUMBER, description: "Persentase pajak/PPN, 0 jika no ppn" },
-            notes: { type: Type.STRING, description: "Catatan pembayaran profesional sesuai bahasa" },
+Teks user: "${prompt}"`;
+
+    const config = {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          language: {
+            type: Type.STRING,
+            description: "Kode bahasa invoice: 'id' untuk Indonesia atau 'en' untuk Inggris",
+          },
+          currency: {
+            type: Type.STRING,
+            description: "Kode mata uang ISO seperti 'IDR', 'USD', 'SGD', 'EUR'",
+          },
+          clientName: { type: Type.STRING },
+          clientAddress: { type: Type.STRING },
+          taxRate: { type: Type.NUMBER, description: "Persentase pajak/PPN, 0 jika no ppn" },
+          notes: { type: Type.STRING, description: "Catatan pembayaran profesional sesuai bahasa" },
+          items: {
+            type: Type.ARRAY,
             items: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  description: { type: Type.STRING, description: "Nama jasa/barang yang rapi dan profesional" },
-                  qty: { type: Type.NUMBER },
-                  price: { type: Type.NUMBER },
-                },
-                required: ["description", "qty", "price"],
+              type: Type.OBJECT,
+              properties: {
+                description: { type: Type.STRING, description: "Nama jasa/barang yang rapi dan profesional" },
+                qty: { type: Type.NUMBER },
+                price: { type: Type.NUMBER },
               },
+              required: ["description", "qty", "price"],
             },
           },
-          required: ["language", "currency", "clientName", "taxRate", "items"],
         },
+        required: ["language", "currency", "clientName", "taxRate", "items"],
       },
-    });
+    };
 
-    const parsed = JSON.parse(response.text || "{}");
-    return NextResponse.json(parsed);
+    let lastError = "";
+
+    for (const model of MODELS) {
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const response = await ai.models.generateContent({
+            model,
+            contents,
+            config,
+          });
+          const parsed = JSON.parse(response.text || "{}");
+          return NextResponse.json(parsed);
+        } catch (err: unknown) {
+          lastError = err instanceof Error ? err.message : "Gagal memproses AI";
+          const isTemporary =
+            lastError.includes("503") ||
+            lastError.includes("UNAVAILABLE") ||
+            lastError.includes("429");
+
+          if (!isTemporary) {
+            break;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 600 * attempt));
+        }
+      }
+    }
+
+    return NextResponse.json(
+      {
+        error:
+          "Server AI sedang tinggi traffic (503). Tunggu beberapa detik lalu klik Generate dari Teks lagi ya.",
+        detail: lastError,
+      },
+      { status: 503 }
+    );
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Gagal memproses AI";
     return NextResponse.json({ error: message }, { status: 500 });
