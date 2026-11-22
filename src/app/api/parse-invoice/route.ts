@@ -12,7 +12,7 @@ export async function POST(req: Request) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: "GEMINI_API_KEY belum dipasang di environment variables (.env.local / Vercel)" },
+        { error: "GEMINI_API_KEY belum dipasang di environment variables" },
         { status: 500 }
       );
     }
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `Ekstrak detail invoice dari teks berikut menjadi struktur JSON yang rapi dan profesional.
-Jika user meminta bahasa tertentu (misalnya "buat in english" atau "in English"), gunakan bahasa tersebut untuk field "language" ("en" atau "id") serta terjemahkan/rapikan deskripsi item dan catatan pembayaran ke bahasa yang diminta.
+Jika user meminta bahasa tertentu (misalnya "in English" atau "buat in english"), gunakan bahasa tersebut untuk field "language" ("en" atau "id") serta terjemahkan/rapikan deskripsi item dan catatan pembayaran ke bahasa yang diminta.
 Teks user: "${prompt}"`,
       config: {
         responseMimeType: "application/json",
